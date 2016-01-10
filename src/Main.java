@@ -50,6 +50,8 @@ public class Main {
 	}
 	/** Constructs a new Main object to run the program. **/
 	public Main(String listingsFile,String matchesFile,String productsFile) {
+		System.out.println("executing...");
+		long c = System.currentTimeMillis();
 		//if the JSON files for the product listings and known products is read successfully
 		if (readJSONFiles(listingsFile,defaultProductsFile)) {
 			//get the match results as a JSON document
@@ -57,7 +59,7 @@ public class Main {
 			//anticipate IO errors
 			try {
 				//attempt to write the JSON text to the output file
-				jsonMatches.writeToFile(matchesFile);
+				jsonMatches.writeToFile(matchesFile,JSONDocument.WriteOption.SINGLE_LINE_OBJECTS);
 			}
 			//catch IO errors
 			catch(IOException e) {
@@ -65,6 +67,7 @@ public class Main {
 				e.printStackTrace();
 				System.out.println("An IO error occurred.");
 			}
+			System.out.println("complete. Time taken: "+((System.currentTimeMillis()-c)/1000)+"secs.");
 		}
 		//else an error occurred
 		else {
@@ -92,7 +95,7 @@ public class Main {
 		//initialise the known products array to the appropriate size
 		products = new SortableProduct[jsonProducts.getChildCount()];
 		//create an array of the fields known products have and any additional fields listings have that are relevant for comparison
-		String[] fields = {"product_name","manufacturer","model","family","announced-date","title"};
+		String[] fields = {"product_name","manufacturer","model","family","announced-date","currency","price","title"};
 		//for each known product
 		for (int i = 0; i != jsonProducts.getChildCount(); i++) {
 			//get the nth product from the JSON document
@@ -125,7 +128,7 @@ public class Main {
 				value[ii] = ( d == null ? null : d.getValue() );
 			}
 			//create a SortableListing object for the read listing and store it in the listings array at the nth index
-			listings[i] = new SortableListing(value[0],value[1],value[2],value[3],value[4],value[5]);
+			listings[i] = new SortableListing(value[0],value[1],value[2],value[3],value[4],value[5],value[6],value[7]);
 		}
 		//if this point is reached, all completed successfully; return true
 		return true;
@@ -219,6 +222,10 @@ public class Main {
 							JSONData object = new JSONData(JSONData.Type.OBJECT);
 							//create and add a new JSONData object to the element, containing the name value and of data type string
 							object.addChild(new JSONData(name,value,JSONData.Type.STRING));
+							//create and add new JSONData objects to the element for other fields in the listing
+							object.addChild(new JSONData("manufacturer",listing.getManufacturer(),JSONData.Type.STRING));
+							object.addChild(new JSONData("currency",listing.getCurrency(),JSONData.Type.STRING));
+							object.addChild(new JSONData("price",listing.getPrice(),JSONData.Type.STRING));
 							//add the element to the listings array for the product in the result table
 							resultTable.get(product.getName()).getData("listings").addChild(object);
 							//exit the best match loop

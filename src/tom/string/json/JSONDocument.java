@@ -16,10 +16,16 @@ import tom.data.LinkedList;
 **/
 
 public class JSONDocument extends JSONData {
+	/**
+	*** WriteOption enum
+	*** Contains values to select write options.
+	**/
+	public enum WriteOption {
+		SINGLE_LINE_OBJECTS,
+		MULTI_LINE_OBJECTS
+	}
 	///The file the XML document is of.
 	private File file;
-	///Counter for virtual key creation.
-	//private long vkey = 0;
 	/** Constructs a new JSONDocument. **/
 	public JSONDocument() {
 		super.setDataType(JSONData.Type.ARRAY);
@@ -267,12 +273,20 @@ public class JSONDocument extends JSONData {
 		}
 		return name;
 	}
-	/** Writes the JSON document to the given file. **/
+	/** Writes the JSON document to the given file. (Convenience method) **/
 	public void writeToFile(String file) throws IOException {
-		writeToFile(new File(file));
+		writeToFile(new File(file),JSONDocument.WriteOption.SINGLE_LINE_OBJECTS);
 	}
 	/** Writes the JSON document to the given file. **/
+	public void writeToFile(String file,JSONDocument.WriteOption writeOption) throws IOException {
+		writeToFile(new File(file),writeOption);
+	}
+	/** Writes the JSON document to the given file. (Convenience method) **/
 	public void writeToFile(File file) throws IOException {
+		this.writeToFile(file,JSONDocument.WriteOption.SINGLE_LINE_OBJECTS);
+	}
+	/** Writes the JSON document to the given file. **/
+	public void writeToFile(File file,JSONDocument.WriteOption writeOption) throws IOException {
 		//create a BufferedWriter
 		BufferedWriter writer = new BufferedWriter(new FileWriter(file));
 		//if the document contains objects
@@ -296,7 +310,7 @@ public class JSONDocument extends JSONData {
 					writer.write("\r\n");
 				}
 				//write it to the file
-				array[i].write(writer);
+				array[i].write(writer,writeOption);
 				previous = array[i];
 			}
 		}

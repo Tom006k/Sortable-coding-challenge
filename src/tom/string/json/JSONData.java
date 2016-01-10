@@ -229,13 +229,8 @@ public class JSONData {
 		if (string.length() < 2) { return false; }
 		return (string.charAt(0) == '"' && string.charAt(string.length()-1) == '"');
 	}
-	/** Returns the JSONData object as a string for writing to a JSON document. **/
+	/** Returns the JSONData object as a string. **/
 	public String toString() {
-		//count parents to set an appropriate indent
-		String indent = "";
-		for (int i = getGenerations()-1; i > 0; i--) {
-			indent+= "	";
-		}
 		//if the name is not null and is not a virtual key, set it
 		String name = (this.name != null && !this.name.matches("^!\\d+$") ? "\""+this.name+"\":" : "");
 		String dataString;
@@ -260,25 +255,48 @@ public class JSONData {
 			return null;
 		}
 		//return the string representation
-		return indent+name+dataString;
+		return name+dataString;
 	}
-	/** Writes this data and all child data via recursion using the given BufferedWriter. **/
-	protected void write(java.io.BufferedWriter writer) throws java.io.IOException {
+	/** Returns the JSONData object as a string for writing to a JSONDocument with tabulation. **/
+	public String toStringWithIndent() {
 		//count parents to set an appropriate indent
 		String indent = "";
+		//for each generation
 		for (int i = getGenerations()-1; i > 0; i--) {
+			//append an indent
 			indent+= "	";
 		}
-		writer.write(indent);
+		//return the string representation indented
+		return indent+this.toString();
+	}
+	/** Writes this data and all child data via recursion using the given BufferedWriter. **/
+	protected void write(java.io.BufferedWriter writer,JSONDocument.WriteOption writeOption) throws java.io.IOException {
+		boolean isMultiLine = ( writeOption == JSONDocument.WriteOption.MULTI_LINE_OBJECTS );
+		//count parents to set an appropriate indent
+		String indent = "";
+		//if each object is to be written with new lines
+		if (isMultiLine) {
+			//for each generation
+			for (int i = getGenerations()-1; i > 0; i--) {
+				//append an indent
+				indent+= "	";
+			}
+			//write the indent
+			writer.write(indent);
+		}
 		//if the name is not null and is not a virtual key, append it
 		if (this.name != null && !this.name.matches("^!\\d+$")) { writer.write("\""+this.name+"\": "); }
 		//if the data is an object
 		if (this.dataType == Type.OBJECT) {
 			//open the object definition
 			writer.write("{");
+			//if the unordered list has been initialised
 			if (unorderedList != null) {
-				//add a new line for readability
-				writer.write("\r\n");
+				//if each object is to be written with new lines
+				if (isMultiLine) {
+					//add a new line for readability
+					writer.write("\r\n");
+				}
 				//get the keys for every child object
 				String[] recoveredKeys = unorderedList.getKeys();
 				//set the previous data to null
@@ -287,19 +305,24 @@ public class JSONData {
 				for (int i = 0; i != recoveredKeys.length; i++) {
 					//if there is a previous item and it also has data
 					if (i != 0 && previousData != null && previousData.toString() != null) {
-						//separate the items with a comma and a new line for readability
-						writer.write(",\r\n");
+						//separate the items with a comma for readability
+						writer.write(",");
+						//if each object is to be written with new lines
+						if (isMultiLine) {
+							//add a new line for readability
+							writer.write("\r\n");
+						}
 					}
 					//get the object at the index
 					JSONData object = unorderedList.get(recoveredKeys[i]);
 					//if it is a type that can have children
 					if (object.getDataType() == JSONData.Type.OBJECT || object.getDataType() == JSONData.Type.ARRAY) {
 						//invoke their write methods
-						object.write(writer);
+						object.write(writer,writeOption);
 					}
 					//else write them here using their toString methods
 					else {
-						String dataString = object.toString();
+						String dataString = ( isMultiLine ? object.toStringWithIndent() : object.toString());
 						//if there is data
 						if (dataString != null) {
 							writer.write(dataString);
@@ -307,35 +330,52 @@ public class JSONData {
 					}
 					previousData = object;
 				}
-				//add a new line for readability
-				writer.write("\r\n");
+				//if each object is to be written with new lines
+				if (isMultiLine) {
+					//add a new line for readability
+					writer.write("\r\n");
+				}
 			}
 			else { writer.write(" "); }
-			writer.write(indent+"}");
+			//if each object is to be written with new lines
+			if (isMultiLine) {
+				writer.write(indent);
+			}
+			//close the object definition
+			writer.write("}");
 		}
 		//else if the data is an array
 		else if (this.dataType == Type.ARRAY) {
-			writer.write(" [");
+			writer.write("[");
+			//if the orderedList has been initialised
 			if (orderedList != null) {
-				//add a new line for readability
-				writer.write("\r\n");
+				//if each object is to be written with new lines
+				if (isMultiLine) {
+					//add a new line for readability
+					writer.write("\r\n");
+				}
 				JSONData[] array = this.getArray();
 				JSONData previousData = null;
 				//for each element in the array
 				for (int i = 0; i != array.length; i++) {
 					//if there is a previous item and it also has data
 					if (i != 0 && previousData != null && previousData.toString() != null) {
-						//separate the items with a comma and a new line for readability
-						writer.write(",\r\n");
+						//separate the items with a comma for readability
+						writer.write(",");
+						//if each object is to be written with new lines
+						if (isMultiLine) {
+							//add a new line for readability
+							writer.write("\r\n");
+						}
 					}
 					//if it is an object or array type, invoke its write method
 					if (array[i].getDataType() == JSONData.Type.OBJECT || array[i].getDataType() == JSONData.Type.ARRAY) {
 						//write it
-						array[i].write(writer);
+						array[i].write(writer,writeOption);
 					}
 					//else use its toString method
 					else {
-						String dataString = array[i].toString();
+						String dataString = ( isMultiLine ? array[i].toStringWithIndent() : array[i].toString());
 						//if there is data
 						if (dataString != null) {
 							writer.write(dataString);
@@ -343,10 +383,18 @@ public class JSONData {
 					}
 					previousData = array[i];
 				}
-				//add a new line for readability
-				writer.write("\r\n");
+				//if each object is to be written with new lines
+				if (isMultiLine) {
+					//add a new line for readability
+					writer.write("\r\n");
+				}
 			}
-			writer.write(indent+"]");
+			//if each object is to be written with new lines
+			if (isMultiLine) {
+				writer.write(indent);
+			}
+			//close the array
+			writer.write("]");
 		}
 		/*redundant code//else if the data is any other legal type
 		else if (this.dataType == Type.STRING || this.dataType == Type.BOOLEAN || this.dataType == Type.NUMBER || this.dataType == Type.NULL) {
