@@ -221,16 +221,16 @@ public class SortableProductMatcher {
 		char[] boundary = {32,'_','-'};
 		//for each boundary character
 		for (int i = 0; i != boundary.length; i++) {
-			//if the subject starts or ends with the search string and is followed by or preceded respectively by the boundary character
-			if (subject.startsWith(search+boundary[i]) || subject.endsWith(boundary[i]+search)) {
-				return true;
-			}
 			//for each boundary character again
 			for (int ii = 0; ii != boundary.length; ii++) {
 				//if the subject contains the search string preceded by the boundary character of the outer loop and followed by the boundary character of this inner loop
 				if (subject.contains(boundary[i]+search+boundary[ii])) {
 					return true;
 				}
+			}
+			//if the subject starts or ends with the search string and is followed by or preceded respectively by the boundary character
+			if (subject.startsWith(search+boundary[i]) || subject.endsWith(boundary[i]+search)) {
+				return true;
 			}
 		}
 		//no match found
