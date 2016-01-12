@@ -166,8 +166,10 @@ public class SortableProductMatcher {
 			return true;
 		}
 		else {
+			String forPattern = "^.*[_\\-\\s]FOR[_\\-\\s](?:.*[_\\-\\s])?"+productModel+"(?:[_\\-\\s\\,].*|$)";
 			//if the model can be matched in title or name
-			if (contains(listing.getTitle(),productModel) || contains(listing.getName(),productModel)) {
+			if ((contains(listing.getTitle(),productModel) && !listing.getTitle().toUpperCase().matches(forPattern)) ||
+				(contains(listing.getName(),productModel) && !listing.getName().toUpperCase().matches(forPattern))) {
 				//return true
 				return true;
 			}
@@ -198,8 +200,9 @@ public class SortableProductMatcher {
 				String[] tokens = productModel.split("[_\\-\\s]+");
 				//for each token
 				for (int ii = 0; ii != tokens.length; ii++) {
-					//if the subject contains the token
-					if (contains(subjects[i],tokens[ii].toUpperCase())) {
+					tokens[ii] = tokens[ii].toUpperCase();
+					//if the subject contains the token, and is not preceded by "for" indicating a different product for use with this product
+					if (contains(subjects[i],tokens[ii]) && !subjects[i].matches("^.*[_\\-\\s]FOR[_\\-\\s](?:.*[_\\-\\s])?"+tokens[ii]+"(?:[_\\-\\s,].*|$)")) {
 						//partial match found
 						return true;
 					}
