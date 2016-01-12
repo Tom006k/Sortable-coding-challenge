@@ -25,9 +25,37 @@ public class SortableProductMatcher {
 	/** Sets the known product for comparison. **/
 	public void setProduct(SortableProduct product) {
 		this.product = product;
-		this.productNamePattern = this.getEscaptedPattern(product.getName().toUpperCase());
+		createProductNamePattern();
+	}
+	/** Creates the product name pattern used for matching. **/
+	private void createProductNamePattern() {
+		String name = product.getName();
+		//if the name is not null
+		if (name != null) {
+			name = name.toUpperCase();
+			String[] fields = {product.getManufacturer(),product.getFamily(),product.getModel()};
+			//for each field
+			for (int i = 0; i != fields.length; i++) {
+				//if it is not null
+				if (fields[i] != null) {
+					fields[i] = fields[i].toUpperCase();
+					//if it is in the product name
+					if (name.contains(fields[i])) {
+						//remove it
+						name = name.replace(fields[i],"");
+					}
+				}
+			}
+		}
+		//the name string should now be whitespaces or contain key word(s) for matching
+		//remove leading and trailing whitespaces and separators
+		name = name.replaceAll("(^[_\\-\\s+]|[_\\-\\s]$)","");
+		this.productNamePattern = this.getEscaptedPattern(name);
 		this.productNamePattern = this.productNamePattern.replaceAll("[_\\-\\s]+","[_\\\\-\\\\s]*");
-		this.productNamePattern = this.productNamePattern.replaceAll("(?:\\[_\\\\-\\\\s\\]\\*)?"+product.getManufacturer()+"(?:\\[_\\\\-\\\\s\\]\\*)?","[_\\\\-\\\\s]*(?:"+product.getManufacturer()+")?[_\\\\-\\\\s]*");
+	}
+	/** Returns the given string with special regular expression characters escaped, excluding hyphens because they will be handled separately. **/
+	private String getEscaptedPattern(String pattern) {
+		return pattern.replaceAll("(\\\\|\\.|\\{|\\}|\\[|\\]|\\*|\\?|\\+|\\^|\\$|\\!|\\(|\\)|\\<|\\>|\\/|\\|)","\\\\$1");
 	}
 	/** Returns the product listing. **/
 	public SortableListing getListing() {
@@ -46,89 +74,166 @@ public class SortableProductMatcher {
 		//create a new result object with no match
 		SortableMatchResult result = new SortableMatchResult(SortableMatchResult.MatchType.NO_MATCH);
 		//compare the known product and product listing
-		//check that the manufacturers are the same
-		if (listing.getManufacturer().equals(product.getManufacturer())) {
-			//if it is a full match
-			if (isFullMatch()) {
-				//set the result type to full match
-				result.setMatchType(SortableMatchResult.MatchType.FULL_MATCH);
+		//if the manufacturer and family match
+		if (isManufacturerMatch() && isFamilyMatch()) {
+			//if the model matches
+			if (isModelMatch()) {
+				//if the remaning text in the product name matches
+				if ((listing.getTitle() != null && listing.getTitle().toUpperCase().matches(".*"+productNamePattern+".*")) ||
+					(listing.getName() != null && listing.getName().toUpperCase().matches(".*"+productNamePattern+".*"))) {
+					//set the type to full match
+					result.setMatchType(SortableMatchResult.MatchType.FULL_MATCH);
+				}
+				else {
+					//set the match type to partial
+					result.setMatchType(SortableMatchResult.MatchType.FULL_PARTIAL_MATCH);
+				}
 			}
-			//else if the listing starts with the product name
-			else if (isStartsWithMatch()) {
-				//set the result type to starts with
-				result.setMatchType(SortableMatchResult.MatchType.STARTS_WITH_MATCH);
+			//else if the model can be matched partially
+			else if (isModelPartialMatch()) {
+				//set the match type to the lowest level
+				result.setMatchType(SortableMatchResult.MatchType.CONTAINS_PARTIAL_MATCH);
 			}
-			//else if the listing contains the product name
-			else if (listingContainsProduct()) {
-				//set the result type to contains
-				result.setMatchType(SortableMatchResult.MatchType.CONTAINS_MATCH);
-			}
-			//other match types are unsuitable because they would create "relevant" matches, but less accurate ones
 		}
 		//return the result
 		return result;
 	}
-	/** Returns the given string with special regular expression characters escaped, excluding hyphens because they will be handled separately. **/
-	private String getEscaptedPattern(String pattern) {
-		return pattern.replaceAll("(\\\\|\\.|\\{|\\}|\\[|\\]|\\*|\\?|\\+|\\^|\\$|\\!|\\(|\\)|\\<|\\>|\\/|\\|)","\\\\$1");
-	}
-	/** Returns whether there is a full match. **/
-	public boolean isFullMatch() {
-		//get the listing name and title
-		String name = listing.getName();
-		String title = listing.getTitle();
-		//if there is a listing title
-		if (title != null) {
-			//attempt a pure string comparison first because it is faster than regex
-			//if it fails, attempt it for the regex equivalent but with the product name pattern string to account for potential differences in word spacing
-			//return the result
-			return (title.equalsIgnoreCase(product.getName()) || title.toUpperCase().matches("^"+productNamePattern+"$"));
+	/** Returns whether the manufacturers match. **/
+	public boolean isManufacturerMatch() {
+		//get the manufacturers from the product and listing
+		String productManufacturer = product.getManufacturer();
+		String listingManufacturer = listing.getManufacturer();
+		//if the product manufacturer isn't specified
+		if (productManufacturer == null) {
+			//it can't be matched
+			return false;
 		}
-		//else if there is a listing name
-		else if (listing.getName() != null) {
-			//attempt a pure string comparison first because it is faster than regex
-			//if it fails, attempt it for the regex equivalent but with the product name pattern string to account for potential differences in word spacing
-			//return the result
-			return (name.equalsIgnoreCase(product.getName()) || name.toUpperCase().matches("^"+productNamePattern+"$"));
+		//compare using the same casing
+		productManufacturer = productManufacturer.toUpperCase();
+		//if the manufacturer can be matched in field
+		if (listingManufacturer != null && productManufacturer.equals(listingManufacturer.toUpperCase())) {
+			return true;
 		}
-		//else return false
-		return false;
-	}
-	/** Returns whether there is a starts with match. **/
-	public boolean isStartsWithMatch() {
-		//if the listing has a title
-		if (listing.getTitle() != null) {
-			String title = listing.getTitle().toUpperCase();
-			//test for the title starting with the product name pattern followed by a whitepsace and anything else, and return the result
-			return title.matches("^"+productNamePattern+"\\s.*");
-		}
-		//else if the listing has a name
-		else if (listing.getName() != null) {
-			//get the name
-			String name = listing.getName().toUpperCase();
-			//test for the name starting with the product name pattern followed by a whitepsace and anything else, and return the result
-			return name.matches("^"+productNamePattern+"\\s.*");
+		else {
+			//if the manufacturer can be matched in title or name
+			if (contains(listing.getTitle(),productManufacturer) || contains(listing.getName(),productManufacturer)) {
+				return true;
+			}
 		}
 		//else return false
 		return false;
 	}
-	/** Returns whether there is a contains match. **/
-	public boolean listingContainsProduct() {
-		//if the listing has a title
-		if (listing.getTitle() != null) {
-			//get the title
-			String title = listing.getTitle().toUpperCase();
-			//test for the name contianing the product name pattern with a whitespace or end-of-string delimiter at either end, and return the result
-			return title.matches(".*(?:^|\\s*)"+productNamePattern+"(?:\\s.*|$)");
+	/** Returns whether the families match. **/
+	public boolean isFamilyMatch() {
+		//get the families from the product and listing
+		String productFamily = product.getFamily();
+		String listingFamily = listing.getFamily();
+		//if the product family isn't specified
+		if (productFamily == null) {
+			//it can't be matched
+			return false;
 		}
-		//else if the listing has a name
-		else if (listing.getName() != null) {
-			//get the name
-			String name = listing.getName().toUpperCase();
-			//test for the name contianing the product name pattern with a whitespace or end-of-string delimiter at either end, and return the result
-			return name.matches(".*(?:^|\\s*)"+productNamePattern+"(?:\\s.*|$)");
+		//compare using the same casing
+		productFamily = productFamily.toUpperCase();
+		//if the family can be matched in field, title or name
+		if (listingFamily != null && productFamily.equals(listingFamily.toUpperCase())) {
+			return true;
+		}
+		else {
+			//if the family can be matched in title or name
+			if (contains(listing.getTitle(),productFamily) || contains(listing.getName(),productFamily)) {
+				//return true
+				return true;
+			}
 		}
 		//else return false
+		return false;
+	}
+	/** Returns whether the models match. **/
+	public boolean isModelMatch() {
+		//get the models form the product and listing
+		String productModel = product.getModel();
+		String listingModel = listing.getModel();
+		//if the product model is not specified
+		if (productModel == null) {
+			//it can't be matched
+			return false;
+		}
+		//compare using the same casing
+		productModel = productModel.toUpperCase();
+		//if the model can be matched in field, title or name
+		if (listingModel != null && productModel.equals(listingModel.toUpperCase())) {
+			return true;
+		}
+		else {
+			//if the model can be matched in title or name
+			if (contains(listing.getTitle(),productModel) || contains(listing.getName(),productModel)) {
+				//return true
+				return true;
+			}
+		}
+		//else return false
+		return false;
+	}
+	/** Returns whether the models match partially. **/
+	public boolean isModelPartialMatch() {
+		//get the product model
+		String productModel = product.getModel();
+		//if it is not specified
+		if (productModel == null) {
+			//it can't be matched
+			return false;
+		}
+		//compare using the same casing
+		productModel = productModel.toUpperCase();
+		//get the title and name of the listing for comparison
+		String[] subjects = {listing.getTitle(),listing.getName()};
+		//for each
+		for (int i = 0; i != subjects.length; i++) {
+			//if the subject is not null
+			if (subjects[i] != null) {
+				//compare using the same casing
+				subjects[i] = subjects[i].toUpperCase();
+				//split the product model into tokens by whitespace, dash and underscore separators
+				String[] tokens = productModel.split("[_\\-\\s]+");
+				//for each token
+				for (int ii = 0; ii != tokens.length; ii++) {
+					//if the subject contains the token
+					if (contains(subjects[i],tokens[ii].toUpperCase())) {
+						//partial match found
+						return true;
+					}
+				}
+			}
+		}
+		//no partial match
+		return false;
+	}
+	/** Returns whether the subject string contains the search string. **/
+	private boolean contains(String subject,String search) {
+		//if the subject is null
+		if (subject == null) {
+			return false;
+		}
+		//compare using the same case
+		subject = subject.toUpperCase();
+		//create an array of allowed boundary characters
+		char[] boundary = {32,'_','-'};
+		//for each boundary character
+		for (int i = 0; i != boundary.length; i++) {
+			//if the subject starts or ends with the search string and is followed by or preceded respectively by the boundary character
+			if (subject.startsWith(search+boundary[i]) || subject.endsWith(boundary[i]+search)) {
+				return true;
+			}
+			//for each boundary character again
+			for (int ii = 0; ii != boundary.length; ii++) {
+				//if the subject contains the search string preceded by the boundary character of the outer loop and followed by the boundary character of this inner loop
+				if (subject.contains(boundary[i]+search+boundary[ii])) {
+					return true;
+				}
+			}
+		}
+		//no match found
 		return false;
 	}
 }
